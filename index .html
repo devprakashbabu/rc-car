@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>RC Controller</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --card: #1a1a1a;
+    --accent: #00c8ff;
+    --green: #00e676;
+    --red: #ff1744;
+    --yellow: #ffea00;
+    --text: #f0f0f0;
+    --dim: #555;
+    --dim2: #333;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", monospace; overflow: hidden; }
+
+  body { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; border-bottom: 1px solid #1e1e1e; flex-shrink: 0;
+  }
+  .logo { font-size: 13px; font-weight: 700; letter-spacing: 0.2em; color: var(--accent); }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: 0.3s; }
+  .dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  /* ── TELEMETRY BAR ── */
+  .telem {
+    display: flex; justify-content: space-around; padding: 6px 16px;
+    border-bottom: 1px solid #1a1a1a; flex-shrink: 0; background: var(--surface);
+  }
+  .telem-item { text-align: center; }
+  .telem-label { font-size: 9px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+  .telem-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
+  /* ── MAIN CONTROL AREA ── */
+  .controls {
+    flex: 1; display: flex; align-items: center;
+    justify-content: space-around; padding: 0 8px; min-height: 0;
+  }
+
+  /* ── JOYSTICK ── */
+  .stick-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .stick-label { font-size: 10px; color: var(--dim); letter-spacing: 0.15em; text-transform: uppercase; }
+
+  .stick-base {
+    width: 150px; height: 150px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, #1e1e1e 0%, #0d0d0d 100%);
+    border: 1.5px solid #2a2a2a;
+    position: relative; touch-action: none;
+    box-shadow: 0 0 0 1px #222 inset, inset 0 2px 8px rgba(0,0,0,0.8);
+  }
+  /* range rings */
+  .stick-base::before {
+    content: ''; position: absolute;
+    width: 60%; height: 60%; border-radius: 50%;
+    border: 1px solid #1e1e1e;
+    top: 20%; left: 20%;
+  }
+  /* crosshair */
+  .stick-base::after {
+    content: ''; position: absolute;
+    width: 100%; height: 1px; background: #1e1e1e; top: 50%;
+    box-shadow: 0 0 0 0, 0 0 0 0;
+  }
+  .crossH { position:absolute; width:100%; height:1px; background:#1e1e1e; top:50%; left:0; pointer-events:none; }
+  .crossV { position:absolute; width:1px; height:100%; background:#1e1e1e; left:50%; top:0; pointer-events:none; }
+
+  .stick-thumb {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #3a3a3a, #111);
+    border: 2px solid var(--dim2);
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: border-color 0.15s;
+  }
+  .stick-thumb.active { border-color: var(--accent); box-shadow: 0 0 12px rgba(0,200,255,0.3); }
+
+  /* ── CENTER PANEL ── */
+  .center-panel { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+  .direction-box {
+    width: 80px; height: 80px; border: 1px solid #1e1e1e; border-radius: 10px;
+    background: var(--card); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+  }
+  .dir-arrow { font-size: 22px; min-height: 28px; }
+  .dir-text  { font-size: 8px; color: var(--dim); letter-spacing: 0.1em; text-align: center; line-height: 1.3; }
+
+  .connect-btn {
+    width: 80px; padding: 10px 0; border-radius: 8px; border: 1px solid var(--accent);
+    background: transparent; color: var(--accent); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
+  }
+  .connect-btn:active { background: rgba(0,200,255,0.1); }
+  .connect-btn.disc { border-color: var(--dim2); color: var(--dim); }
+
+  .stop-btn {
+    width: 80px; padding: 10px 0; border-radius: 8px;
+    border: 1px solid var(--red); background: transparent;
+    color: var(--red); font-size: 11px; font-weight: 900;
+    letter-spacing: 0.15em; cursor: pointer;
+  }
+  .stop-btn:active { background: rgba(255,23,68,0.1); }
+
+  /* ── SETTINGS PANEL ── */
+  .settings {
+    flex-shrink: 0; background: var(--surface);
+    border-top: 1px solid #1a1a1a; padding: 8px 16px 12px;
+  }
+  .settings-title {
+    font-size: 9px; color: var(--dim); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 8px; text-align: center;
+  }
+  .setting-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .setting-name { font-size: 10px; color: var(--dim); width: 52px; flex-shrink: 0; }
+  .setting-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--dim2); border-radius: 2px; outline: none;
+  }
+  .setting-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .setting-val { font-size: 10px; color: var(--accent); width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="logo">RC CONTROLLER</span>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="statusText">OFFLINE</span>
+  </div>
+</div>
+
+<!-- TELEMETRY -->
+<div class="telem">
+  <div class="telem-item">
+    <div class="telem-label">Left Motor</div>
+    <div class="telem-val" id="telL">0</div>
+  </div>
+  <div class="telem-item">
+    <div class="telem-label">Throttle</div>
+    <div class="telem-val" id="telT">0%</div>
+  </div>
+  <div class="telem-item">
+    <div class="telem-label">Steer</div>
+    <div class="telem-val" id="telS">0%</div>
+  </div>
+  <div class="telem-item">
+    <div class="telem-label">Right Motor</div>
+    <div class="telem-val" id="telR">0</div>
+  </div>
+</div>
+
+<!-- MAIN CONTROLS -->
+<div class="controls">
+
+  <!-- LEFT STICK: Throttle (up/down only, X ignored) -->
+  <div class="stick-wrap">
+    <div class="stick-base" id="stickL" data-axis="throttle">
+      <div class="crossH"></div><div class="crossV"></div>
+      <div class="stick-thumb" id="thumbL"></div>
+    </div>
+    <span class="stick-label">Throttle</span>
+  </div>
+
+  <!-- CENTER -->
+  <div class="center-panel">
+    <div class="direction-box">
+      <div class="dir-arrow" id="dirArrow">⏹</div>
+      <div class="dir-text"  id="dirText">STOPPED</div>
+    </div>
+    <button class="connect-btn" id="connectBtn">CONNECT</button>
+    <button class="stop-btn" id="stopBtn">STOP</button>
+  </div>
+
+  <!-- RIGHT STICK: Steering (left/right only, Y ignored) -->
+  <div class="stick-wrap">
+    <div class="stick-base" id="stickR" data-axis="steering">
+      <div class="crossH"></div><div class="crossV"></div>
+      <div class="stick-thumb" id="thumbR"></div>
+    </div>
+    <span class="stick-label">Steering</span>
+  </div>
+
+</div>
+
+<!-- SETTINGS -->
+<div class="settings">
+  <div class="settings-title">⚙ Tuning</div>
+  <div class="setting-row">
+    <span class="setting-name">Expo</span>
+    <input type="range" class="setting-slider" id="slExpo" min="0" max="100" value="60">
+    <span class="setting-val" id="lblExpo">0.60</span>
+  </div>
+  <div class="setting-row">
+    <span class="setting-name">Steer Rate</span>
+    <input type="range" class="setting-slider" id="slRate" min="10" max="100" value="80">
+    <span class="setting-val" id="lblRate">0.80</span>
+  </div>
+  <div class="setting-row">
+    <span class="setting-name">Accel</span>
+    <input type="range" class="setting-slider" id="slRamp" min="2" max="50" value="15">
+    <span class="setting-val" id="lblRamp">0.15</span>
+  </div>
+</div>
+
+<script>
+const SERVICE_UUID        = "91bad492-b950-4226-aa2b-4ede9fa42f59";
+const CHARACTERISTIC_UUID = "cba1d466-344c-4be3-ab3f-189f80dd7518";
+
+// ── State ──
+let throttle = 0; // -1..1
+let steering = 0; // -1..1
+let device = null, characteristic = null;
+let sendTimer = null, pendingCmd = null;
+
+// ── BLE ──
+async function connect() {
+  if (!navigator.bluetooth) {
+    document.getElementById('statusText').textContent = 'NO BT API';
+    return;
+  }
+  try {
+    document.getElementById('statusText').textContent = 'SCANNING';
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'ESP32-RC-Car' }],
+      optionalServices: [SERVICE_UUID]
+    });
+    device.addEventListener('gattserverdisconnected', onDisconnect);
+    document.getElementById('statusText').textContent = 'LINKING';
+    const server  = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+    onConnect();
+  } catch(e) {
+    console.error(e);
+    document.getElementById('statusText').textContent = 'FAILED';
+  }
+}
+
+function onConnect() {
+  document.getElementById('dot').classList.add('on');
+  document.getElementById('statusText').textContent = 'ONLINE';
+  document.getElementById('connectBtn').textContent = 'DISCONNECT';
+  document.getElementById('connectBtn').classList.add('disc');
+}
+
+function onDisconnect() {
+  document.getElementById('dot').classList.remove('on');
+  document.getElementById('statusText').textContent = 'OFFLINE';
+  document.getElementById('connectBtn').textContent = 'CONNECT';
+  document.getElementById('connectBtn').classList.remove('disc');
+  characteristic = null;
+}
+
+document.getElementById('connectBtn').addEventListener('click', () => {
+  if (device && device.gatt.connected) device.gatt.disconnect();
+  else connect();
+});
+
+document.getElementById('stopBtn').addEventListener('click', () => {
+  throttle = 0; steering = 0;
+  resetStick('L'); resetStick('R');
+  sendNow('T:0,S:0');
+  updateTelemetry(0, 0);
+  updateDirection(0, 0);
+});
+
+// ── Throttle & Steering mix → motor values ──
+function expo(val, e) {
+  return val * (1 - e) + val * val * val * e;
+}
+
+function computeMotors(t, s, expoVal, rateVal) {
+  t = expo(t, expoVal);
+  s = expo(s, expoVal) * rateVal;
+
+  let left  = t + s;
+  let right = t - s;
+  const mx = Math.max(Math.abs(left), Math.abs(right), 1);
+  left /= mx; right /= mx;
+
+  const mag = Math.min(Math.sqrt(t*t + s*s), 1.0);
+  left *= mag; right *= mag;
+
+  return {
+    left:  Math.round(left  * 1023),
+    right: Math.round(right * 1023)
+  };
+}
+
+function updateTelemetry(t, s) {
+  const expo  = parseFloat(document.getElementById('lblExpo').textContent);
+  const rate  = parseFloat(document.getElementById('lblRate').textContent);
+  const { left, right } = computeMotors(t, s, expo, rate);
+  document.getElementById('telL').textContent = left;
+  document.getElementById('telR').textContent = right;
+  document.getElementById('telT').textContent = Math.round(t * 100) + '%';
+  document.getElementById('telS').textContent = Math.round(s * 100) + '%';
+}
+
+function updateDirection(t, s) {
+  const mag = Math.sqrt(t*t + s*s);
+  let arrow = '⏹', text = 'STOPPED';
+  if (mag > 0.05) {
+    if      (t >  0.3 && Math.abs(s) < 0.3)  { arrow = '⬆'; text = 'FORWARD'; }
+    else if (t < -0.3 && Math.abs(s) < 0.3)  { arrow = '⬇'; text = 'REVERSE'; }
+    else if (s >  0.3 && Math.abs(t) < 0.3)  { arrow = '➡'; text = 'TURN\nRIGHT'; }
+    else if (s < -0.3 && Math.abs(t) < 0.3)  { arrow = '⬅'; text = 'TURN\nLEFT'; }
+    else if (t >  0.1 && s >  0.1) { arrow = '↗'; text = 'FWD\nRIGHT'; }
+    else if (t >  0.1 && s < -0.1) { arrow = '↖'; text = 'FWD\nLEFT'; }
+    else if (t < -0.1 && s >  0.1) { arrow = '↘'; text = 'REV\nRIGHT'; }
+    else if (t < -0.1 && s < -0.1) { arrow = '↙'; text = 'REV\nLEFT'; }
+    else { arrow = '⏺'; text = 'SLOW'; }
+  }
+  document.getElementById('dirArrow').textContent = arrow;
+  document.getElementById('dirText').textContent  = text;
+}
+
+// ── Joystick logic ──
+const sticks = {
+  L: { el: document.getElementById('stickL'), thumb: document.getElementById('thumbL'), nx: 0, ny: 0, active: false },
+  R: { el: document.getElementById('stickR'), thumb: document.getElementById('thumbR'), nx: 0, ny: 0, active: false }
+};
+
+function getStickId(el) {
+  if (el === sticks.L.el || sticks.L.el.contains(el)) return 'L';
+  if (el === sticks.R.el || sticks.R.el.contains(el)) return 'R';
+  return null;
+}
+
+function moveStick(id, clientX, clientY) {
+  const st = sticks[id];
+  const rect = st.el.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+  const radius = rect.width / 2 - 4;
+  let dx = clientX - cx;
+  let dy = clientY - cy;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist > radius) { dx = dx/dist*radius; dy = dy/dist*radius; }
+
+  // Left stick: only Y (throttle), lock X to center
+  // Right stick: only X (steering), lock Y to center
+  if (id === 'L') dx = 0;
+  if (id === 'R') dy = 0;
+
+  st.nx =  dx / radius;
+  st.ny = -dy / radius;
+
+  const offX = (id === 'L') ? 0 : dx;
+  const offY = (id === 'R') ? 0 : dy;
+  st.thumb.style.transform = `translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`;
+
+  throttle = sticks.L.ny;
+  steering = sticks.R.nx;
+
+  updateTelemetry(throttle, steering);
+  updateDirection(throttle, steering);
+  queueSend();
+}
+
+function resetStick(id) {
+  const st = sticks[id];
+  st.nx = 0; st.ny = 0; st.active = false;
+  st.thumb.classList.remove('active');
+  st.thumb.style.transform = 'translate(-50%, -50%)';
+  throttle = sticks.L.ny;
+  steering = sticks.R.nx;
+  updateTelemetry(throttle, steering);
+  updateDirection(throttle, steering);
+}
+
+// Multi-touch tracking
+const touchMap = {};
+
+document.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const id = getStickId(document.elementFromPoint(t.clientX, t.clientY));
+    if (id) {
+      touchMap[t.identifier] = id;
+      sticks[id].active = true;
+      sticks[id].thumb.classList.add('active');
+      moveStick(id, t.clientX, t.clientY);
+    }
+  }
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    const id = touchMap[t.identifier];
+    if (id) moveStick(id, t.clientX, t.clientY);
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) {
+    const id = touchMap[t.identifier];
+    if (id) { delete touchMap[t.identifier]; resetStick(id); }
+  }
+});
+
+// ── BLE send ──
+function buildCmd() {
+  const expo = parseFloat(document.getElementById('lblExpo').textContent);
+  const rate = parseFloat(document.getElementById('lblRate').textContent);
+  const t = Math.round(throttle * 1023);
+  const s = Math.round(steering * 1023);
+  return `T:${t},S:${s}`;
+}
+
+function queueSend() {
+  pendingCmd = buildCmd();
+  if (sendTimer) return;
+  sendTimer = setTimeout(async () => {
+    sendTimer = null;
+    if (pendingCmd && characteristic) {
+      const c = pendingCmd; pendingCmd = null;
+      try { await characteristic.writeValueWithoutResponse(new TextEncoder().encode(c)); }
+      catch(e) { console.error(e); }
+    }
+  }, 30); // ~33Hz
+}
+
+async function sendNow(cmd) {
+  if (!characteristic) return;
+  try { await characteristic.writeValueWithoutResponse(new TextEncoder().encode(cmd)); }
+  catch(e) {}
+}
+
+// ── Settings sliders ──
+function setupSetting(sliderId, labelId, divisor, cmdPrefix) {
+  const slider = document.getElementById(sliderId);
+  const label  = document.getElementById(labelId);
+  slider.addEventListener('input', () => {
+    const val = (slider.value / divisor).toFixed(2);
+    label.textContent = val;
+    sendNow(`${cmdPrefix}:${val}`);
+  });
+}
+setupSetting('slExpo', 'lblExpo', 100, 'EXPO');
+setupSetting('slRate', 'lblRate', 100, 'RATE');
+setupSetting('slRamp', 'lblRamp', 100, 'RAMP');
+</script>
+</body>
+</html>
